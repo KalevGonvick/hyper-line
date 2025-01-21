@@ -1,0 +1,27 @@
+[package]
+name = "hyper-line"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
+
+[dependencies]
+hyper = { version = "1.5.1", features = [ "http1", "http2", "server" ] }
+http-body-util = "0.1.2"
+hyper-util = { version = "0.1.10", features = ["full"] }
+tokio = { version = "1.42.0", features = ["full"] }
+tokio-rustls = "0.26.1"
+rustls = { version = "0.23.19", features = ["tls12"] }
+rustls-pemfile = "2.2.0"
+log = "0.4.22"
+serde_json = "1.0.133"
+serde = { version = "1.0.215", features = ["derive"] }
+lazy_static = "1.5.0"
+tracing = "0.1.41"
+hyper-rustls = { version = "0.27.3", features = ["http2"] }
+webpki-roots = "0.26.7"
+env_logger = "0.11.5"
