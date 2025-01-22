@@ -131,8 +131,11 @@ pub struct ProxyConfig {
 }
 
 impl ProxyConfig {
-    pub fn load(path: &str) -> Result<Self, ()>
-        where for<'a> Self: Deserialize<'a>
+    pub fn load(
+        path: &str
+    ) -> Result<Self, ()>
+    where
+        for<'a> Self: Deserialize<'a>
     {
         if let Ok(mut file) = File::open(path) {
             let mut contents = String::new();

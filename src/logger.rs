@@ -38,20 +38,13 @@ pub fn setup_logger() {
     }).init();
 }
 
-pub const DARK_GREY_HIGHLIGHT: Style = Style::new()
-    .fg_color(Some(Color::Ansi256(Ansi256Color(8))));
-pub const RED_HIGHLIGHT: Style = Style::new()
-    .fg_color(Some(Color::Ansi256(Ansi256Color(9))));
-pub const GREEN_HIGHLIGHT: Style = Style::new()
-    .fg_color(Some(Color::Ansi256(Ansi256Color(10))));
-pub const YELLOW_HIGHLIGHT: Style = Style::new()
-    .fg_color(Some(Color::Ansi256(Ansi256Color(11))));
-pub const BLUE_HIGHLIGHT: Style = Style::new()
-    .fg_color(Some(Color::Ansi256(Ansi256Color(12))));
-pub const PURPLE_HIGHLIGHT: Style = Style::new()
-    .fg_color(Some(Color::Ansi256(Ansi256Color(13))));
-pub const AQUA_HIGHLIGHT: Style = Style::new()
-    .fg_color(Some(Color::Ansi256(Ansi256Color(14))));
+pub const DARK_GREY_HIGHLIGHT: Style = Style::new().fg_color(Some(Color::Ansi256(Ansi256Color(8))));
+pub const RED_HIGHLIGHT: Style = Style::new().fg_color(Some(Color::Ansi256(Ansi256Color(9))));
+pub const GREEN_HIGHLIGHT: Style = Style::new().fg_color(Some(Color::Ansi256(Ansi256Color(10))));
+pub const YELLOW_HIGHLIGHT: Style = Style::new().fg_color(Some(Color::Ansi256(Ansi256Color(11))));
+pub const BLUE_HIGHLIGHT: Style = Style::new().fg_color(Some(Color::Ansi256(Ansi256Color(12))));
+pub const PURPLE_HIGHLIGHT: Style = Style::new().fg_color(Some(Color::Ansi256(Ansi256Color(13))));
+pub const AQUA_HIGHLIGHT: Style = Style::new().fg_color(Some(Color::Ansi256(Ansi256Color(14))));
 pub const DEFAULT_STYLE: Style = BLUE_HIGHLIGHT;
 pub const TIMESTAMP_STYLE: Style = DARK_GREY_HIGHLIGHT.underline();
 pub const THREAD_NAME_STYLE: Style = AQUA_HIGHLIGHT.bold();

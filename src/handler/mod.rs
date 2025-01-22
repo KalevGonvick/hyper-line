@@ -15,7 +15,7 @@ use http_body_util::{BodyExt, Empty};
 use hyper::body::{Buf, Bytes, Incoming};
 use hyper::{Request, Response};
 use hyper::service::Service;
-use crate::config::{HttpMethod, ServerServiceConfig};
+use crate::config::{HttpMethod, ServerConfig};
 use crate::exchange::Exchange;
 
 
@@ -25,19 +25,22 @@ pub trait Handler: Send
         &'i1 self,
         context: &'i2 mut Exchange
     ) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>>
-        where 'i1: 'o,
-            'i2: 'o,
-            Self: 'o;
+    where
+        'i1: 'o,
+        'i2: 'o,
+        Self: 'o;
 }
 
 #[derive(Clone)]
 pub struct ExecutorService {
-    service_config: Arc<ServerServiceConfig>,
+    service_config: Arc<ServerConfig>,
     src: SocketAddr,
 }
 
 impl ExecutorService {
-    pub fn new(service_config: Arc<ServerServiceConfig>) -> Self {
+    pub fn new(
+        service_config: Arc<ServerConfig>
+    ) -> Self {
         Self {
             service_config,
             src: SocketAddr::V4("127.0.0.1".parse().unwrap()),
@@ -55,7 +58,10 @@ impl Service<Request<Incoming>> for ExecutorService
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
-    fn call(&self, req: Request<Incoming>) -> Self::Future {
+    fn call(
+        &self, req: Request<Incoming>
+    ) -> Self::Future
+    {
         let exec_svc_context = self.clone();
         let fut = async move {
             let mut exchange = Exchange::new(exec_svc_context.src.clone());

@@ -1,22 +1,13 @@
 use std::collections::HashMap;
-use std::convert::Infallible;
 use std::fmt::{Debug, Display, Formatter};
-use std::fs::File;
 use std::future::Future;
 use std::io::Read;
-use std::marker;
 use std::pin::Pin;
 use std::str::FromStr;
-use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::{Buf, Bytes};
-use serde_json::Value;
 use serde::Deserialize;
 use crate::exchange::Exchange;
-use crate::handler::exchange_trace_handler::{ChainExecutionStartHandler, ChainExecutionStopHandler};
 use crate::handler::{Handler};
-use crate::handler::default_handler::DefaultHandler;
-use crate::handler::request_echo_handler::RequestEchoHandler;
-use crate::handler::reverse_proxy_handler::{ProxyConfig, ReverseProxyHandler};
 
 type ConfigError = Box<dyn std::error::Error>;
 
@@ -152,7 +143,7 @@ pub struct PathConfig {
 }
 
 #[derive(Deserialize, Default)]
-pub struct ServerServiceConfig {
+pub struct ServerConfig {
     pub paths: Vec<PathConfig>,
 }
 
