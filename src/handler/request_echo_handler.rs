@@ -1,5 +1,8 @@
 use std::future::Future;
 use std::pin::Pin;
+use hyper::http::response::Parts;
+use hyper::Response;
+use log::info;
 use crate::exchange::Exchange;
 use crate::handler::Handler;
 
@@ -17,10 +20,12 @@ impl Handler for RequestEchoHandler
         'i2: 'o
     {
         Box::pin(async move {
-//            let consumed = context.consume_request_context();
-//            let res = consumed.1.into_body().collect().await.unwrap().boxed_unsync();
-//            Ok(Exchange::new(consumed.0, consumed.3, hyper::Response::new(res), consumed.2))
-            todo!()
+            info!("Echo handler");
+            let consumed = context.consume_request().unwrap();
+            let (_, request) = consumed.into_parts();
+            let echoed_response = Response::new(request);
+            context.save_response(echoed_response).await;
+            Ok(())
         })
     }
 }
