@@ -1,39 +1,25 @@
 use std::future::Future;
-use std::{env, fs, io};
-use std::collections::HashMap;
-use std::convert::Infallible;
+use std::{fs, io::Read, io::BufReader};
 use std::fs::File;
-use std::io::{BufReader, Read};
-use std::marker::PhantomData;
-use std::net::{IpAddr, SocketAddr, ToSocketAddrs};
+use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
-use std::str::FromStr;
-use http_body_util::{Empty, Full};
-use std::sync::{Arc, LockResult, OnceLock, RwLock};
-use std::sync::LazyLock;
-use std::time::{Duration, SystemTime};
-use hyper::body::{Buf, Bytes, Incoming};
+use http_body_util::Empty;
+use std::sync::OnceLock;
+use std::time::Duration;
+use hyper::body::Bytes;
 use hyper_util::rt::{TokioIo, TokioTimer};
-use rustls::{ClientConfig, ConfigBuilder, RootCertStore};
+use rustls::{ClientConfig, RootCertStore};
 use crate::exchange::Exchange;
-use crate::attachment_key::AttachmentKey;
 use http_body_util::BodyExt;
-use http_body_util::combinators::UnsyncBoxBody;
-use hyper::{client, Error, HeaderMap, Request, Response, StatusCode, Uri};
+use hyper::{Error, HeaderMap, Request, Response, StatusCode, Uri};
 use hyper::client::conn;
-use hyper::client::conn::TrySendError;
 use hyper::header::{HeaderName, HeaderValue, InvalidHeaderValue, ToStrError};
 use hyper::http::uri::InvalidUri;
-use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
-use hyper_util::server::conn::auto::Connection;
-use lazy_static::lazy_static;
-use rustls::pki_types::ServerName;
+use hyper_rustls::HttpsConnector;
 use serde::Deserialize;
-use tokio::io::{AsyncRead, AsyncWrite, copy_bidirectional};
+use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
-use tokio_rustls::client::TlsStream;
-use tokio_rustls::TlsConnector;
-use crate::{handler, ChannelBody, ServiceExecutor};
+use crate::{ChannelBody, ServiceExecutor};
 use hyper_util::client::legacy::{connect::Connect, Client, Error as LegacyError};
 use hyper_util::client::legacy::connect::HttpConnector;
 use log::{debug, warn};
@@ -47,8 +33,8 @@ fn proxy_client() -> &'static ReverseProxy<HttpsConnector<HttpConnector>> {
         let mut ca = match cert_str {
             Some(ref path)  => {
                 let f = fs::File::open(path)
-                    .map_err(|e| todo!()).unwrap();
-                let rd = io::BufReader::new(f);
+                    .map_err(|_| todo!()).unwrap();
+                let rd = BufReader::new(f);
                 Some(rd)
             }
             None => None,
@@ -461,7 +447,7 @@ pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
 
         debug!("Responding to call with response");
         return Ok(create_proxied_response(
-            response.map(|body| body.map_err(|e|todo!()).boxed_unsync()),
+            response.map(|body| body.map_err(|_|todo!()).boxed_unsync()),
         ));
     }
 
@@ -508,7 +494,7 @@ pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
         }
     });
 
-    Ok(downstream_response.map(|body| body.map_err(|e|todo!()).boxed_unsync()))
+    Ok(downstream_response.map(|body| body.map_err(|_|todo!()).boxed_unsync()))
 }
 
 #[derive(Debug, Clone)]

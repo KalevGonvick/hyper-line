@@ -1,6 +1,5 @@
 use std::future::Future;
 use std::pin::Pin;
-use hyper::http::response::Parts;
 use hyper::Response;
 use log::info;
 use crate::exchange::Exchange;
@@ -24,7 +23,7 @@ impl Handler for RequestEchoHandler
             let consumed = context.consume_request().unwrap();
             let (_, request) = consumed.into_parts();
             let echoed_response = Response::new(request);
-            context.save_response(echoed_response).await;
+            context.save_response(echoed_response);
             Ok(())
         })
     }

@@ -1,18 +1,16 @@
 pub mod reverse_proxy_handler;
 pub mod exchange_trace_handler;
-pub mod default_handler;
 pub mod request_echo_handler;
 
 use std::convert::Infallible;
 use std::future::Future;
 use std::net::SocketAddr;
-use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not};
 use std::pin::Pin;
 use std::str::FromStr;
 use std::sync::Arc;
 use http_body_util::combinators::UnsyncBoxBody;
-use http_body_util::{BodyExt, Empty};
-use hyper::body::{Buf, Bytes, Incoming};
+use http_body_util::Empty;
+use hyper::body::{Bytes, Incoming};
 use hyper::{Request, Response};
 use hyper::service::Service;
 use crate::config::{HttpMethod, ServerConfig};
@@ -33,16 +31,16 @@ pub trait Handler: Send
 
 #[derive(Clone)]
 pub struct ExecutorService {
-    service_config: Arc<ServerConfig>,
+    config: Arc<ServerConfig>,
     src: SocketAddr,
 }
 
 impl ExecutorService {
     pub fn new(
-        service_config: Arc<ServerConfig>
+        config: Arc<ServerConfig>
     ) -> Self {
         Self {
-            service_config,
+            config,
             src: SocketAddr::V4("127.0.0.1".parse().unwrap()),
         }
     }
@@ -64,8 +62,8 @@ impl Service<Request<Incoming>> for ExecutorService
     {
         let exec_svc_context = self.clone();
         let fut = async move {
-            let mut exchange = Exchange::new(exec_svc_context.src.clone());
-            for path in &exec_svc_context.service_config.paths {
+            let _exchange = Exchange::new(exec_svc_context.src.clone());
+            for path in &exec_svc_context.config.paths {
                 let http_method = match HttpMethod::from_str(&req.method().as_str()) {
                     Ok(method) => method,
                     Err(_) => panic!("Could not convert method {}", &req.method().as_str())

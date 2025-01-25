@@ -1,11 +1,10 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::future::Future;
-use std::io::Read;
 use std::pin::Pin;
 use std::str::FromStr;
-use hyper::body::{Buf, Bytes};
 use serde::Deserialize;
+use rustls::ServerConfig as TlsServerConfig;
 use crate::exchange::Exchange;
 use crate::handler::{Handler};
 
@@ -18,7 +17,7 @@ pub struct HandlerRegister {
 
 impl HandlerRegister
 {
-    pub fn register(&mut self, handler_name: String, handler_instance: Box<dyn Handler>) -> Result<(), ConfigError> {
+    pub fn register(&mut self, handler_name: String, _handler_instance: Box<dyn Handler>) -> Result<(), ConfigError> {
         if !self.registered.contains_key(&handler_name) {
 
         }
@@ -134,17 +133,23 @@ impl FromStr for HttpMethod {
     }
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Default)]
 pub struct PathConfig {
     pub path: String,
     pub method: HttpMethod,
-    pub request: Vec<Box<dyn Handler>>,
-    pub response: Vec<Box<dyn Handler>>,
+    pub request: Vec<Box<dyn Handler + Sync + Send + 'static>>,
+    pub response: Vec<Box<dyn Handler + Sync + Send + 'static>>,
 }
 
-#[derive(Deserialize, Default)]
+#[derive(Default)]
 pub struct ServerConfig {
-    pub paths: Vec<PathConfig>,
+    pub(crate) worker_threads: usize,
+    pub(crate)worker_thread_name: String,
+    pub(crate) port: u16,
+    pub(crate) config_dir: String,
+    pub(crate) tls_enabled: bool,
+    pub(crate) tls_server_config: Option<TlsServerConfig>,
+    pub(crate) paths: Vec<PathConfig>,
 }
 
 //fn register_handlers(registered_handlers: &mut Vec<Registry>, handler_strings: &Vec<String>) -> Result<(), ()> {
@@ -220,7 +225,7 @@ mod test {
     impl Handler for TestRegisterHandler
     {
 
-        fn process<'i1, 'i2, 'o>(&'i1 self, context: &'i2 mut Exchange) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>> where 'i1: 'o, 'i2: 'o, Self: 'o {
+        fn process<'i1, 'i2, 'o>(&'i1 self, _context: &'i2 mut Exchange) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>> where 'i1: 'o, 'i2: 'o, Self: 'o {
             todo!()
         }
     }
