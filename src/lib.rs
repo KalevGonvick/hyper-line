@@ -1,14 +1,14 @@
 #![allow(dead_code)]
-mod handler;
+pub mod handler;
 pub mod config;
 mod service;
 pub mod status;
 pub mod callback;
 pub mod attachment_key;
-mod exchange;
-mod cert_manager;
-mod logger;
-mod server;
+pub mod exchange;
+pub mod cert_manager;
+pub mod logger;
+pub mod server;
 
 use std::convert::Infallible;
 

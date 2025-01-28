@@ -7,7 +7,7 @@ use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 use rustls::ServerConfig as TlsServerConfig;
 use crate::config::{PathConfig, ServerConfig};
-use crate::handler::ExecutorService;
+use crate::service::ExecutorService;
 use crate::service::ServiceExecutor;
 
 pub struct ServerBuilder {
@@ -72,7 +72,7 @@ impl ServerBuilder {
     }
 }
 
-fn run_server(config: ServerConfig) -> Result<(), ()> {
+pub fn run_server(config: ServerConfig) -> Result<(), ()> {
     let server_thread_name = config.worker_thread_name.clone();
     let rt = tokio::runtime::Builder::new_multi_thread()
         .worker_threads(config.worker_threads)

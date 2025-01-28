@@ -29,6 +29,9 @@ fn proxy_client() -> &'static ReverseProxy<HttpsConnector<HttpConnector>> {
     static PROXY_CLIENT: OnceLock<ReverseProxy<HttpsConnector<HttpConnector>>> = OnceLock::new();
     PROXY_CLIENT.get_or_init(|| {
 
+        // TODO: Allow for non tls requests.
+        // TODO: Use loaded certs from server.
+        // TODO: Allow configuration to be separate from the server certs.
         let cert_str = Some("./client.pem");
         let mut ca = match cert_str {
             Some(ref path)  => {
@@ -98,7 +101,9 @@ impl Handler for ReverseProxyHandler {
     {
         Box::pin(async move {
             if let Ok(req) = context.consume_request() {
-                let res = match proxy_client().call(context.src().ip(), format!("{}:{}{}", self.destination_host(), self.destination_port(), req.uri().path()).as_str(), req).await {
+
+                // TODO: Make this http or https
+                let res = match proxy_client().call(context.src().ip(), format!("http://{}:{}{}", self.destination_host(), self.destination_port(), req.uri().path()).as_str(), req).await {
                     Ok(res) => res,
                     Err(e) => panic!("proxy failed with error: {:?}", e)
                 };
@@ -112,8 +117,8 @@ impl Handler for ReverseProxyHandler {
 
 #[derive(Deserialize)]
 pub struct ProxyConfig {
-    destination_host: String,
-    destination_port: u16
+    pub destination_host: String,
+    pub destination_port: u16
 }
 
 impl ProxyConfig {

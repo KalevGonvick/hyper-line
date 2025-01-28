@@ -20,8 +20,14 @@ rustls-pemfile = "2.2.0"
 log = "0.4.22"
 serde_json = "1.0.133"
 serde = { version = "1.0.215", features = ["derive"] }
-lazy_static = "1.5.0"
-tracing = "0.1.41"
 hyper-rustls = { version = "0.27.3", features = ["http2"] }
 webpki-roots = "0.26.7"
 env_logger = "0.11.5"
+
+[[example]]
+name = "proxy_example"
+path = "examples/proxy/proxy_example.rs"
+
+[[example]]
+name = "echo_example"
+path = "examples/echo/echo_example.rs"
