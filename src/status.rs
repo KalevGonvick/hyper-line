@@ -1,5 +1,6 @@
 use std::ops::{BitAnd, BitAndAssign, BitOr, BitOrAssign, Not};
 
+#[derive(Clone,Copy)]
 pub struct Status(pub i32);
 
 #[inline]
@@ -15,7 +16,7 @@ pub const fn i32_bit_mask(low: i32, high: i32) -> i32 {
 }
 
 impl Status {
-    const RESPONSE_CODE_BITMASK: i32 = i32_bit_mask(0, 9);
+    pub const RESPONSE_CODE_BITMASK: i32 = i32_bit_mask(0, 9);
     pub const REQUEST_CONSUMED: Self = Self(1 << 10);
     pub const RESPONSE_CONSUMED: Self = Self(1 << 11);
     pub const REQUEST_LISTENERS_COMPLETE: Self = Self(1 << 12);

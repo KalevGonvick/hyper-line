@@ -73,6 +73,9 @@ impl Service<Request<Incoming>> for ExecutorService
                         }
                     }
 
+
+
+
 //                    for middleware in &path.request.loaded_middleware {
 //                        match match middleware.get() {
 //                            Ok(x) => x,

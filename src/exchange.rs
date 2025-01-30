@@ -24,6 +24,7 @@ pub struct Exchange
 impl Exchange {
 
     pub fn new(src: SocketAddr) -> Self {
+        log::debug!("Building new exchange for client: {}", src);
         Self {
             status: Status(200),
             src,
@@ -102,6 +103,8 @@ impl Exchange {
             self.status |= Status::REQUEST_LISTENERS_COMPLETE;
             return self.execute_callbacks(&self.request_listeners);
         }
+
+        log::error!("Request listeners have already been executed.");
         Err(())
     }
 
@@ -113,6 +116,8 @@ impl Exchange {
             self.status |= Status::RESPONSE_LISTENERS_COMPLETE;
             return self.execute_callbacks(&self.response_listeners);
         }
+
+        log::error!("Response listeners have already been executed.");
         Err(())
     }
 
@@ -125,6 +130,7 @@ impl Exchange {
     {
         let mut pos = 0usize;
         while !callbacks.is_empty() && pos < callbacks.len() {
+            log::trace!("Executing callback {}", pos);
             match callbacks.get(pos) {
                 Some(callback) => callback.invoke(Box::new(self)),
                 None => return Err(())
@@ -163,6 +169,8 @@ impl Exchange {
         if self.status.all_flags_clear(Status::REQUEST_CONSUMED) {
             return Ok(&self.request);
         }
+
+        log::error!("A request has already been saved for this exchange.");
         Err(())
     }
 
@@ -176,8 +184,15 @@ impl Exchange {
     {
         if self.status.all_flags_clear(Status::REQUEST_CONSUMED) {
             self.status |= Status::REQUEST_CONSUMED;
-            let consumed = std::mem::take(&mut self.request);
-            return Ok(consumed);
+            match self.execute_request_listeners() {
+                Ok(_) => {
+                    log::debug!("Successfully executed request listeners.");
+                    let consumed = std::mem::take(&mut self.request);
+                    return Ok(consumed);
+                }
+                Err(_) => todo!()
+            }
+
         }
         Err(())
     }
@@ -196,9 +211,23 @@ impl Exchange {
     {
         if self.status.all_flags_clear(Status::RESPONSE_CONSUMED) {
             self.status |= Status::RESPONSE_CONSUMED;
-            let consumed = std::mem::take(&mut self.response);
-            return Ok(consumed);
+            match self.execute_response_listeners() {
+                Ok(_) => {
+                    log::debug!("Successfully executed response listeners.");
+                    let response_code = self.status.0 & Status::RESPONSE_CODE_BITMASK;
+                    *self.response.status_mut() = hyper::StatusCode::from_u16(response_code as u16).unwrap();
+                    log::debug!("Response code: {}", response_code);
+                    let consumed = std::mem::take(&mut self.response);
+                    return Ok(consumed);
+                },
+                Err(_) => todo!()
+            }
+
         }
         Err(())
+    }
+
+    pub fn status(&self) -> &Status {
+        &self.status
     }
 }
