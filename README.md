@@ -21,9 +21,7 @@ They should also have the option to create request/response completion listeners
 - [ ] Externalize TLS Configuration
 - [ ] Protobuf Support
 - [ ] Address Endless todo!() Statements
-
-## Outstanding Tasks
-- [ ] Allow reverse proxy handler to be non-tls
+- [ ] Documentation (Guides, Contribution, etc.)
 
 * * *
 

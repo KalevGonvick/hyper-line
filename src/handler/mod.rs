@@ -5,6 +5,8 @@ use std::future::Future;
 use std::pin::Pin;
 use crate::exchange::Exchange;
 
+pub struct HandlerId(pub String);
+pub struct HandlerEntry(HandlerId, Box<dyn Handler + Sync + Send + 'static>);
 
 pub trait Handler: Send
 {
@@ -16,6 +18,20 @@ pub trait Handler: Send
         'i1: 'o,
         'i2: 'o,
         Self: 'o;
+
+//    fn handler_id(&self) -> HandlerId;
+//    fn register_handler(self) -> HandlerEntry
+//    where
+//        Self: Sync + Send + 'static
+//    {
+//
+//        let id = self.handler_id();
+//        HandlerEntry{0: id, 1: Box::new(self)}
+//    }
+
+
+
+
 }
 
 

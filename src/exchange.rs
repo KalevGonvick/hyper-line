@@ -2,6 +2,7 @@ use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::{Bytes, Incoming};
 use hyper::{Request, Response};
@@ -9,21 +10,22 @@ use crate::attachment_key::AttachmentKey;
 use crate::callback::Callback;
 use crate::status::Status;
 use http_body_util::BodyExt;
+use crate::config::ServerConfig;
 
-pub struct Exchange
-{
+pub struct Exchange {
     status: Status,
     src: SocketAddr,
     request: Request<UnsyncBoxBody<Bytes, Infallible>>,
     response: Response<UnsyncBoxBody<Bytes, Infallible>>,
     request_listeners: Vec<Callback<Self>>,
     response_listeners: Vec<Callback<Self>>,
-    attachments: HashMap<(AttachmentKey, TypeId), Box<dyn Any + Send>>
+    attachments: HashMap<(AttachmentKey, TypeId), Box<dyn Any + Send>>,
+    server_config: Arc<ServerConfig>
 }
 
 impl Exchange {
 
-    pub fn new(src: SocketAddr) -> Self {
+    pub fn new(src: SocketAddr, server_config: Arc<ServerConfig>) -> Self {
         log::debug!("Building new exchange for client: {}", src);
         Self {
             status: Status(200),
@@ -32,7 +34,8 @@ impl Exchange {
             response: Response::default(),
             request_listeners: vec![],
             response_listeners: vec![],
-            attachments: HashMap::new()
+            attachments: HashMap::new(),
+            server_config
         }
     }
     pub fn add_attachment<K>(
@@ -176,6 +179,10 @@ impl Exchange {
 
     pub fn src(&self) -> &SocketAddr {
         &self.src
+    }
+
+    pub fn server_config(&self) -> &ServerConfig {
+        &self.server_config
     }
 
     pub fn consume_request(

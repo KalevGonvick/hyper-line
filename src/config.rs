@@ -4,7 +4,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::str::FromStr;
 use serde::Deserialize;
-use rustls::ServerConfig as TlsServerConfig;
+use rustls::{ClientConfig as TlsClientConfig, ServerConfig as TlsServerConfig};
 use crate::exchange::Exchange;
 use crate::handler::{Handler};
 
@@ -149,6 +149,7 @@ pub struct ServerConfig {
     pub(crate) config_dir: String,
     pub(crate) tls_enabled: bool,
     pub(crate) tls_server_config: Option<TlsServerConfig>,
+    pub(crate) tls_client_config: Option<TlsClientConfig>,
     pub(crate) paths: Vec<PathConfig>,
 }
 

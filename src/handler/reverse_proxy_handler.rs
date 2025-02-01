@@ -4,18 +4,19 @@ use std::fs::File;
 use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 use http_body_util::Empty;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use hyper::body::Bytes;
 use hyper_util::rt::{TokioIo, TokioTimer};
-use rustls::{ClientConfig, RootCertStore};
+use rustls::{ClientConfig as TlsClientConfig, ClientConfig, RootCertStore};
 use crate::exchange::Exchange;
 use http_body_util::BodyExt;
 use hyper::{Error, HeaderMap, Request, Response, StatusCode, Uri};
 use hyper::client::conn;
+use hyper::ext::Protocol;
 use hyper::header::{HeaderName, HeaderValue, InvalidHeaderValue, ToStrError};
 use hyper::http::uri::InvalidUri;
-use hyper_rustls::HttpsConnector;
+use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
 use serde::Deserialize;
 use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
@@ -23,48 +24,41 @@ use crate::{ChannelBody, ServiceExecutor};
 use hyper_util::client::legacy::{connect::Connect, Client, Error as LegacyError};
 use hyper_util::client::legacy::connect::HttpConnector;
 use log::{debug, warn};
+use crate::config::ServerConfig;
 use crate::handler::Handler;
 
-fn proxy_client() -> &'static ReverseProxy<HttpsConnector<HttpConnector>> {
+fn proxy_client(config: &ServerConfig) -> &'static ReverseProxy<HttpsConnector<HttpConnector>> {
     static PROXY_CLIENT: OnceLock<ReverseProxy<HttpsConnector<HttpConnector>>> = OnceLock::new();
     PROXY_CLIENT.get_or_init(|| {
 
-        // TODO: Allow for non tls requests.
-        // TODO: Use loaded certs from server.
         // TODO: Allow configuration to be separate from the server certs.
-        let cert_str = Some("./client.pem");
-        let mut ca = match cert_str {
-            Some(ref path)  => {
-                let f = fs::File::open(path)
-                    .map_err(|_| todo!()).unwrap();
-                let rd = BufReader::new(f);
-                Some(rd)
+        let connector = if config.tls_enabled {
+            match &config.tls_client_config {
+                None => panic!("TLS Enabled, but no client configuration is set!"),
+                Some(config) => {
+                    HttpsConnector::<HttpConnector>::builder()
+                        .with_tls_config(config.clone())
+                        .https_or_http()
+                        .enable_http2()
+                        .build()
+                }
             }
-            None => None,
+        } else {
+            HttpsConnector::<HttpConnector>::builder()
+                .with_tls_config(TlsClientConfig::builder()
+                    .with_webpki_roots()
+                    .with_no_client_auth())
+                .https_or_http()
+                .enable_http2()
+                .build()
         };
-        let mut root_certs = RootCertStore::empty();
-        match ca {
-            None => root_certs.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned()),
-            Some(ref mut ca) => {
-                let certs = rustls_pemfile::certs(ca).collect::<Result<Vec<_>, _>>().unwrap();
-                root_certs.add_parsable_certificates(certs);
-            }
-        }
-        let connector: HttpsConnector<HttpConnector> = HttpsConnector::<HttpConnector>::builder()
-            .with_tls_config(
-                ClientConfig::builder()
-                    .with_root_certificates(root_certs)
-                    .with_no_client_auth(),
-            )
-            .https_or_http()
-            .enable_http2()
-            .build();
-        ReverseProxy::new(
+
+        return ReverseProxy::new(
             hyper_util::client::legacy::Builder::new(ServiceExecutor)
                 .pool_idle_timeout(Duration::from_secs(3))
                 .pool_timer(TokioTimer::new())
                 .build::<_, ChannelBody>(connector),
-        )
+        );
     })
 }
 
@@ -102,8 +96,13 @@ impl Handler for ReverseProxyHandler {
         Box::pin(async move {
             if let Ok(req) = context.consume_request() {
 
-                // TODO: Make this http or https
-                let res = match proxy_client().call(context.src().ip(), format!("http://{}:{}{}", self.destination_host(), self.destination_port(), req.uri().path()).as_str(), req).await {
+                let protocol: String = if context.server_config().tls_enabled {
+                    "http".to_string()
+                } else {
+                    "https".to_string()
+                };
+                let full_url = format!("{}://{}:{}{}", protocol, self.destination_host(), self.destination_port(), req.uri().path());
+                let res = match proxy_client(context.server_config()).call(context.src().ip(), full_url.as_str(), req).await {
                     Ok(res) => res,
                     Err(e) => panic!("proxy failed with error: {:?}", e)
                 };
