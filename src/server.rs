@@ -6,6 +6,7 @@ use hyper_util::server::conn::auto;
 use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 use rustls::ServerConfig as TlsServerConfig;
+use rustls::ClientConfig as TlsClientConfig;
 use crate::config::{PathConfig, ServerConfig};
 use crate::service::ExecutorService;
 use crate::service::ServiceExecutor;
@@ -17,6 +18,7 @@ pub struct ServerBuilder {
     port: u16,
     tls_enabled: bool,
     tls_server_config: Option<TlsServerConfig>,
+    tls_client_config: Option<TlsClientConfig>,
     paths: Vec<PathConfig>,
 }
 
@@ -30,6 +32,7 @@ impl ServerBuilder {
             port: 8080,
             tls_enabled: false,
             tls_server_config: None,
+            tls_client_config: None,
             paths: Vec::new(),
         }
     }
@@ -52,6 +55,12 @@ impl ServerBuilder {
     pub fn tls_server_config(&mut self, value: TlsServerConfig) -> &mut Self {
         self.tls_enabled = true;
         self.tls_server_config = Some(value);
+        self
+    }
+
+    pub fn tls_client_config(&mut self, value: TlsClientConfig) -> &mut Self {
+        self.tls_enabled = true;
+        self.tls_client_config = Some(value);
         self
     }
 
@@ -144,7 +153,9 @@ pub fn run_server(config: ServerConfig) -> Result<(), ()> {
                 let mut exec_svc_clone = exec_svc.clone();
                 exec_svc_clone.set_src(remote_addr);
                 tokio::spawn(async move {
-                    if let Err(err) = auto::Builder::new(ServiceExecutor).serve_connection(io, exec_svc_clone).await {
+                    if let Err(err) = auto::Builder::new(ServiceExecutor)
+                        .serve_connection(io, exec_svc_clone)
+                        .await {
                         eprintln!("failed to serve connection: {:#}", err);
                     }
                 });

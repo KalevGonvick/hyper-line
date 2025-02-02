@@ -1,19 +1,18 @@
 use std::future::Future;
-use std::{fs, io::Read, io::BufReader};
+use std::io::Read;
 use std::fs::File;
 use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 use http_body_util::Empty;
-use std::sync::{Arc, OnceLock};
+use std::sync::OnceLock;
 use std::time::Duration;
 use hyper::body::Bytes;
 use hyper_util::rt::{TokioIo, TokioTimer};
-use rustls::{ClientConfig as TlsClientConfig, ClientConfig, RootCertStore};
+use rustls::ClientConfig as TlsClientConfig;
 use crate::exchange::Exchange;
 use http_body_util::BodyExt;
 use hyper::{Error, HeaderMap, Request, Response, StatusCode, Uri};
 use hyper::client::conn;
-use hyper::ext::Protocol;
 use hyper::header::{HeaderName, HeaderValue, InvalidHeaderValue, ToStrError};
 use hyper::http::uri::InvalidUri;
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
@@ -102,7 +101,9 @@ impl Handler for ReverseProxyHandler {
                     "https".to_string()
                 };
                 let full_url = format!("{}://{}:{}{}", protocol, self.destination_host(), self.destination_port(), req.uri().path());
-                let res = match proxy_client(context.server_config()).call(context.src().ip(), full_url.as_str(), req).await {
+                let res = match proxy_client(context.server_config())
+                    .call(context.src().ip(), full_url.as_str(), req)
+                    .await {
                     Ok(res) => res,
                     Err(e) => panic!("proxy failed with error: {:?}", e)
                 };
