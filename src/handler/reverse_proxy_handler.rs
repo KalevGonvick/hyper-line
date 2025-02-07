@@ -1,52 +1,52 @@
-use std::future::Future;
-use std::io::Read;
-use std::fs::File;
-use std::net::{IpAddr, SocketAddr};
-use std::pin::Pin;
-use http_body_util::Empty;
-use std::sync::OnceLock;
-use std::time::Duration;
-use hyper::body::Bytes;
-use hyper_util::rt::{TokioIo, TokioTimer};
-use rustls::ClientConfig as TlsClientConfig;
+use crate::config::ServerConfig;
 use crate::exchange::Exchange;
+use crate::handler::Handler;
+use crate::ChannelBody;
 use http_body_util::BodyExt;
-use hyper::{Error, HeaderMap, Request, Response, StatusCode, Uri};
+use http_body_util::Empty;
+use hyper::body::Bytes;
 use hyper::client::conn;
 use hyper::header::{HeaderName, HeaderValue, InvalidHeaderValue, ToStrError};
 use hyper::http::uri::InvalidUri;
+use hyper::{Error, HeaderMap, Request, Response, StatusCode, Uri};
 use hyper_rustls::{ConfigBuilderExt, HttpsConnector};
+use hyper_util::client::legacy::connect::HttpConnector;
+use hyper_util::client::legacy::{connect::Connect, Client, Error as LegacyError};
+use hyper_util::rt::{TokioIo, TokioTimer};
+use log::{debug, warn};
+use rustls::ClientConfig as TlsClientConfig;
 use serde::Deserialize;
+use std::fs::File;
+use std::future::Future;
+use std::io::Read;
+use std::net::{IpAddr, SocketAddr};
+use std::pin::Pin;
+use std::sync::OnceLock;
+use std::time::Duration;
 use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
-use crate::{ChannelBody, ServiceExecutor};
-use hyper_util::client::legacy::{connect::Connect, Client, Error as LegacyError};
-use hyper_util::client::legacy::connect::HttpConnector;
-use log::{debug, warn};
-use crate::config::ServerConfig;
-use crate::handler::Handler;
+use crate::service::ServiceExecutor;
 
 fn proxy_client(config: &ServerConfig) -> &'static ReverseProxy<HttpsConnector<HttpConnector>> {
     static PROXY_CLIENT: OnceLock<ReverseProxy<HttpsConnector<HttpConnector>>> = OnceLock::new();
     PROXY_CLIENT.get_or_init(|| {
-
         // TODO: Allow configuration to be separate from the server certs.
         let connector = if config.tls_enabled {
             match &config.tls_client_config {
                 None => panic!("TLS Enabled, but no client configuration is set!"),
-                Some(config) => {
-                    HttpsConnector::<HttpConnector>::builder()
-                        .with_tls_config(config.clone())
-                        .https_or_http()
-                        .enable_http2()
-                        .build()
-                }
+                Some(config) => HttpsConnector::<HttpConnector>::builder()
+                    .with_tls_config(config.clone())
+                    .https_or_http()
+                    .enable_http2()
+                    .build(),
             }
         } else {
             HttpsConnector::<HttpConnector>::builder()
-                .with_tls_config(TlsClientConfig::builder()
-                    .with_webpki_roots()
-                    .with_no_client_auth())
+                .with_tls_config(
+                    TlsClientConfig::builder()
+                        .with_webpki_roots()
+                        .with_no_client_auth(),
+                )
                 .https_or_http()
                 .enable_http2()
                 .build()
@@ -61,16 +61,13 @@ fn proxy_client(config: &ServerConfig) -> &'static ReverseProxy<HttpsConnector<H
     })
 }
 
-
 pub struct ReverseProxyHandler {
-    proxy_config: ProxyConfig
+    proxy_config: ProxyConfig,
 }
 
 impl ReverseProxyHandler {
     pub fn new(proxy_config: ProxyConfig) -> Self {
-        Self {
-            proxy_config
-        }
+        Self { proxy_config }
     }
 
     fn destination_host(&self) -> &String {
@@ -83,32 +80,37 @@ impl ReverseProxyHandler {
 }
 
 impl Handler for ReverseProxyHandler {
-
     fn process<'i1, 'i2, 'o>(
         &'i1 self,
-        context: &'i2 mut Exchange
+        context: &'i2 mut Exchange,
     ) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>>
     where
         'i1: 'o,
-        'i2: 'o
+        'i2: 'o,
     {
         Box::pin(async move {
             if let Ok(req) = context.consume_request() {
-
                 let protocol: String = if context.server_config().tls_enabled {
                     "http".to_string()
                 } else {
                     "https".to_string()
                 };
-                let full_url = format!("{}://{}:{}{}", protocol, self.destination_host(), self.destination_port(), req.uri().path());
+                let full_url = format!(
+                    "{}://{}:{}{}",
+                    protocol,
+                    self.destination_host(),
+                    self.destination_port(),
+                    req.uri().path()
+                );
                 let res = match proxy_client(context.server_config())
                     .call(context.src().ip(), full_url.as_str(), req)
-                    .await {
+                    .await
+                {
                     Ok(res) => res,
-                    Err(e) => panic!("proxy failed with error: {:?}", e)
+                    Err(e) => panic!("proxy failed with error: {:?}", e),
                 };
                 context.save_response(res);
-                return Ok(())
+                return Ok(());
             }
             Err(())
         })
@@ -118,15 +120,13 @@ impl Handler for ReverseProxyHandler {
 #[derive(Deserialize)]
 pub struct ProxyConfig {
     pub destination_host: String,
-    pub destination_port: u16
+    pub destination_port: u16,
 }
 
 impl ProxyConfig {
-    pub fn load(
-        path: &str
-    ) -> Result<Self, ()>
+    pub fn load(path: &str) -> Result<Self, ()>
     where
-        for<'a> Self: Deserialize<'a>
+        for<'a> Self: Deserialize<'a>,
     {
         if let Ok(mut file) = File::open(path) {
             let mut contents = String::new();
@@ -236,25 +236,31 @@ fn remove_hop_headers(headers: &mut HeaderMap) {
     }
 }
 
-fn get_upgrade_type(
-    headers: &HeaderMap
-) -> Option<String> {
-
+fn get_upgrade_type(headers: &HeaderMap) -> Option<String> {
     #[allow(clippy::blocks_in_conditions)]
-    if headers.get(connection_header()).map(|value| {
-            value.to_str().unwrap().split(',').any(|e| e.trim() == *upgrade_header())
-        }).unwrap_or(false) {
+    if headers
+        .get(connection_header())
+        .map(|value| {
+            value
+                .to_str()
+                .unwrap()
+                .split(',')
+                .any(|e| e.trim() == *upgrade_header())
+        })
+        .unwrap_or(false)
+    {
         if let Some(upgrade_value) = headers.get(upgrade_header()) {
-            debug!("Found upgrade header with value: {}",upgrade_value.to_str().unwrap().to_owned());
+            debug!(
+                "Found upgrade header with value: {}",
+                upgrade_value.to_str().unwrap().to_owned()
+            );
             return Some(upgrade_value.to_str().unwrap().to_owned());
         }
     }
     None
 }
 
-fn remove_connection_headers(
-    headers: &mut HeaderMap
-) {
+fn remove_connection_headers(headers: &mut HeaderMap) {
     if headers.get(connection_header()).is_some() {
         debug!("Removing connection headers");
         let value = headers.get(connection_header()).cloned().unwrap();
@@ -266,10 +272,7 @@ fn remove_connection_headers(
     }
 }
 
-fn create_proxied_response<B>(
-    mut response: Response<B>
-) -> Response<B>
-{
+fn create_proxied_response<B>(mut response: Response<B>) -> Response<B> {
     debug!("Creating proxied response");
 
     remove_hop_headers(response.headers_mut());
@@ -278,10 +281,7 @@ fn create_proxied_response<B>(
     response
 }
 
-fn create_forward_uri<B>(
-    forward_url: &str,
-    req: &Request<B>
-) -> String {
+fn create_forward_uri<B>(forward_url: &str, req: &Request<B>) -> String {
     debug!("Building forward uri");
 
     let split_url = forward_url.split('?').collect::<Vec<&str>>();
@@ -311,8 +311,7 @@ fn create_forward_uri<B>(
     url.push_str(base_url);
     url.push_str(path2);
 
-    if !forward_url_query.is_empty() ||
-        req.uri().query().map(|e| !e.is_empty()).unwrap_or(false) {
+    if !forward_url_query.is_empty() || req.uri().query().map(|e| !e.is_empty()).unwrap_or(false) {
         debug!("Adding query parts to url");
         url.push('?');
         url.push_str(forward_url_query);
@@ -362,16 +361,20 @@ fn create_proxied_request(
     client_ip: IpAddr,
     mut request: Request<ChannelBody>,
     upgrade_type: Option<&String>,
-) -> Result<Request<ChannelBody>, ProxyError>
-{
+) -> Result<Request<ChannelBody>, ProxyError> {
     debug!("Creating proxied request");
 
     let contains_te_trailers_value = request
         .headers()
         .get(te_header())
         .map(|value| {
-            value.to_str().unwrap().split(',').any(|e| e.trim() == *trailers_header())
-        }).unwrap_or(false);
+            value
+                .to_str()
+                .unwrap()
+                .split(',')
+                .any(|e| e.trim() == *trailers_header())
+        })
+        .unwrap_or(false);
 
     debug!("Setting headers of proxied request");
 
@@ -380,13 +383,19 @@ fn create_proxied_request(
 
     if contains_te_trailers_value {
         debug!("Setting up trailer headers");
-        request.headers_mut().insert(te_header(), HeaderValue::from_static("trailers"));
+        request
+            .headers_mut()
+            .insert(te_header(), HeaderValue::from_static("trailers"));
     }
 
     if let Some(value) = upgrade_type {
         debug!("Repopulate upgrade headers");
-        request.headers_mut().insert(upgrade_header(), value.parse().unwrap());
-        request.headers_mut().insert(connection_header(), HeaderValue::from_static("UPGRADE"));
+        request
+            .headers_mut()
+            .insert(upgrade_header(), value.parse().unwrap());
+        request
+            .headers_mut()
+            .insert(connection_header(), HeaderValue::from_static("UPGRADE"));
     }
 
     // Add forwarding information in the headers
@@ -414,10 +423,7 @@ fn create_proxied_request(
     Ok(request)
 }
 
-fn get_upstream_addr(
-    forward_uri: &str
-) -> Result<SocketAddr, ProxyError>
-{
+fn get_upstream_addr(forward_uri: &str) -> Result<SocketAddr, ProxyError> {
     let forward_uri: Uri = forward_uri.parse().map_err(|e| {
         ProxyError::UpstreamError(format!("parsing forward_uri as a Uri: {e}").to_string())
     })?;
@@ -438,7 +444,12 @@ pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
     request: Request<ChannelBody>,
     client: &Client<T, ChannelBody>,
 ) -> Result<Response<ChannelBody>, ProxyError> {
-    debug!("Received proxy call from {} to {}, client: {}",request.uri().to_string(),forward_uri,client_ip);
+    debug!(
+        "Received proxy call from {} to {}, client: {}",
+        request.uri().to_string(),
+        forward_uri,
+        client_ip
+    );
 
     let request_upgrade_type = get_upgrade_type(request.headers());
 
@@ -452,7 +463,7 @@ pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
 
         debug!("Responding to call with response");
         return Ok(create_proxied_response(
-            response.map(|body| body.map_err(|_|todo!()).boxed_unsync()),
+            response.map(|body| body.map_err(|_| todo!()).boxed_unsync()),
         ));
     }
 
@@ -462,7 +473,11 @@ pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
     let mut downstream_request = Request::from_parts(request_parts, request_body);
 
     let (mut upstream_conn, downstream_response) = {
-        let conn = TokioIo::new(TcpStream::connect(upstream_addr).await.map_err(|e| ProxyError::UpstreamError(e.to_string()))?);
+        let conn = TokioIo::new(
+            TcpStream::connect(upstream_addr)
+                .await
+                .map_err(|e| ProxyError::UpstreamError(e.to_string()))?,
+        );
         let (mut sender, conn) = conn::http1::handshake(conn).await?;
 
         tokio::task::spawn(async move {
@@ -482,7 +497,10 @@ pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
         let (response_parts, response_body) = response.into_parts();
         let upstream_response = Response::from_parts(response_parts.clone(), response_body);
         let downstream_response = Response::from_parts(response_parts, Empty::new());
-        (TokioIo::new(hyper::upgrade::on(upstream_response).await?), downstream_response)
+        (
+            TokioIo::new(hyper::upgrade::on(upstream_response).await?),
+            downstream_response,
+        )
     };
 
     tokio::task::spawn(async move {
@@ -499,7 +517,7 @@ pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
         }
     });
 
-    Ok(downstream_response.map(|body| body.map_err(|_|todo!()).boxed_unsync()))
+    Ok(downstream_response.map(|body| body.map_err(|_| todo!()).boxed_unsync()))
 }
 
 #[derive(Debug, Clone)]
@@ -521,6 +539,3 @@ impl<T: Connect + Clone + Send + Sync + 'static> ReverseProxy<T> {
         call::<T>(client_ip, forward_uri, request, &self.client).await
     }
 }
-
-
-

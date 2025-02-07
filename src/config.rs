@@ -1,12 +1,9 @@
 use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
-use std::future::Future;
-use std::pin::Pin;
 use std::str::FromStr;
 use serde::Deserialize;
 use rustls::{ClientConfig as TlsClientConfig, ServerConfig as TlsServerConfig};
-use crate::exchange::Exchange;
-use crate::handler::{Handler};
+use crate::handler::Handler;
 
 type ConfigError = Box<dyn std::error::Error>;
 
@@ -67,54 +64,6 @@ pub enum HttpMethod {
     Patch
 }
 
-//pub enum Registry {
-//    /* request handlers */
-//    Default(DefaultHandler),
-//    ProxyHandler(ReverseProxyHandler),
-//    RequestEchoHandler(RequestEchoHandler),
-//
-//    /* request middleware */
-//    ChainExecutionStartHandler(ChainExecutionStartHandler),
-//
-//    /* response middleware */
-//    ChainExecutionStopHandler(ChainExecutionStopHandler),
-//
-//}
-//
-//impl Default for Registry {
-//    fn default() -> Self {
-//        Registry::Default(DefaultHandler::default())
-//    }
-//}
-//
-//impl FromStr for Registry {
-//    type Err = ();
-//
-//    fn from_str(s: &str) -> Result<Self, Self::Err> {
-//        match s.to_lowercase().as_str() {
-//            "chainexecutionstophandler" => Ok(Registry::ChainExecutionStopHandler(ChainExecutionStopHandler::default())),
-//            "requestechohandler" => Ok(Registry::RequestEchoHandler(RequestEchoHandler::default())),
-//            "chainexecutionstarthandler" => Ok(Registry::ChainExecutionStartHandler(ChainExecutionStartHandler::default())),
-//            "reverseproxyhandler"=> {
-//                let proxy_config = ProxyConfig::load("./config/proxy.json");
-//                let proxy_handler = ReverseProxyHandler::new(proxy_config.unwrap());
-//                Ok(Registry::ProxyHandler(proxy_handler))
-//            },
-//            _ => Err(())
-//        }
-//    }
-//}
-//
-//impl Registry
-//{
-//    pub fn get(&self) -> Result<&dyn Handler, ()> {
-//        match self {
-//            Registry::ChainExecutionStartHandler(handler) => Ok(handler),
-//            |_ => Err(())
-//        }
-//    }
-//}
-
 impl FromStr for HttpMethod {
     type Err = ();
 
@@ -151,89 +100,4 @@ pub struct ServerConfig {
     pub(crate) tls_server_config: Option<TlsServerConfig>,
     pub(crate) tls_client_config: Option<TlsClientConfig>,
     pub(crate) paths: Vec<PathConfig>,
-}
-
-//fn register_handlers(registered_handlers: &mut Vec<Registry>, handler_strings: &Vec<String>) -> Result<(), ()> {
-//    for handler_string in handler_strings {
-//        match Registry::from_str(handler_string) {
-//            Ok(handler) => {
-//                registered_handlers.push(handler);
-//            },
-//            Err(e) => return Err(e)
-//        }
-//    }
-//    Ok(())
-//}
-
-//pub fn load_from_file(path: String) -> Option<ServerServiceConfig> {
-//    if let Ok(mut file) = File::open(path) {
-//        let mut contents = String::new();
-//        if let Err(e) = file.read_to_string(&mut contents) {
-//            panic!("File contains non-UTF-8 characters: {}", e)
-//        }
-//        if let Ok(config) = serde_json::from_str(&contents) {
-//            let mut server_service_config: ServerServiceConfig = config;
-//            for path_config in &mut server_service_config.paths {
-//                let mut request_middleware: Vec<Registry> = vec![];
-//                if let Some(chain) = path_config.request.middleware.as_ref() {
-//                    match register_handlers(&mut request_middleware, chain) {
-//                        Ok(_) => {},
-//                        Err(_) => panic!("Could not register request chain middleware for path: {}", path_config.path)
-//                    }
-//                }
-//                path_config.request.loaded_middleware = request_middleware;
-//                let request_handler = match path_config.request.handler.as_ref() {
-//                    None => Registry::Default(DefaultHandler::default()),
-//                    Some(handler) => {
-//                        match Registry::from_str(handler) {
-//                            Ok(handler) => handler,
-//                            Err(_) => panic!("Could not register request handler for path: {}", path_config.path)
-//                        }
-//                    }
-//                };
-//                path_config.request.loaded_handler = request_handler;
-//
-//                let mut response_middleware: Vec<Registry> = vec![];
-//                if let Some(chain) = path_config.response.middleware.as_ref() {
-//                    match register_handlers(&mut response_middleware, chain) {
-//                        Ok(_) => {},
-//                        Err(_) => panic!("Could not register response chain handlers for path: {}", path_config.path)
-//                    }
-//                }
-//                path_config.response.loaded_middleware = response_middleware;
-//                let response_handler = match path_config.response.handler.as_ref() {
-//                    None => Registry::Default(DefaultHandler::default()),
-//                    Some(handler) => {
-//                        match Registry::from_str(handler) {
-//                            Ok(handler) => handler,
-//                            Err(_) => panic!("Could not register response handler for path: {}", path_config.path)
-//                        }
-//                    }
-//                };
-//                path_config.response.loaded_handler = response_handler;
-//            }
-//            return Some(server_service_config);
-//        }
-//    }
-//    return None;
-//}
-
-mod test {
-    use super::*;
-
-    #[derive(Debug, Clone, Default)]
-    pub struct TestRegisterHandler;
-    impl Handler for TestRegisterHandler
-    {
-
-        fn process<'i1, 'i2, 'o>(&'i1 self, _context: &'i2 mut Exchange) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>> where 'i1: 'o, 'i2: 'o, Self: 'o {
-            todo!()
-        }
-    }
-
-    #[test]
-    fn test_register() {
-        let register = HandlerRegister::default();
-        //let test_middleware =
-    }
 }

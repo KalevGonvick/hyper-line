@@ -9,25 +9,12 @@ pub mod exchange;
 pub mod cert_manager;
 pub mod logger;
 pub mod server;
-
 use std::convert::Infallible;
-
-
 use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::Bytes;
 
-
-use crate::service::ServiceExecutor;
-
 pub type ChannelBody = UnsyncBoxBody<Bytes, Infallible>;
 
-fn main() {
-//    logger::setup_logger();
-//    if let Err(e) = run_server() {
-//        eprintln!("FAILED: {:?}", e);
-//        std::process::exit(1);
-//    }
-}
 
 
 
