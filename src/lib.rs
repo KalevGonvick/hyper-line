@@ -12,7 +12,6 @@ pub mod server;
 use std::convert::Infallible;
 use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::Bytes;
-
 pub type ChannelBody = UnsyncBoxBody<Bytes, Infallible>;
 
 

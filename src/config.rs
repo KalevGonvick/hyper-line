@@ -1,36 +1,14 @@
-use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter};
+use std::convert::Infallible;
+use std::fmt::{Debug, Display};
 use std::str::FromStr;
+use http_body_util::combinators::UnsyncBoxBody;
+use hyper::body::Bytes;
+use hyper::{Request, Response};
 use serde::Deserialize;
 use rustls::{ClientConfig as TlsClientConfig, ServerConfig as TlsServerConfig};
 use crate::handler::Handler;
 
 type ConfigError = Box<dyn std::error::Error>;
-
-#[derive(Default)]
-pub struct HandlerRegister {
-    registered: HashMap<String, Box<dyn Handler>>
-}
-
-impl HandlerRegister
-{
-    pub fn register(&mut self, handler_name: String, _handler_instance: Box<dyn Handler>) -> Result<(), ConfigError> {
-        if !self.registered.contains_key(&handler_name) {
-
-        }
-        Err(DuplicateHandlerError.into())
-    }
-}
-
-#[derive(Debug, Clone)]
-struct DuplicateHandlerError;
-
-impl Display for DuplicateHandlerError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Duplicate handler defined.")
-    }
-}
-impl std::error::Error for DuplicateHandlerError {}
 
 #[derive(Deserialize, Debug, Clone, PartialOrd, PartialEq, Default)]
 pub enum HttpMethod {
@@ -83,11 +61,12 @@ impl FromStr for HttpMethod {
 }
 
 #[derive(Default)]
-pub struct PathConfig {
+pub struct PathConfig
+{
     pub path: String,
     pub method: HttpMethod,
-    pub request: Vec<Box<dyn Handler + Sync + Send + 'static>>,
-    pub response: Vec<Box<dyn Handler + Sync + Send + 'static>>,
+    pub request: Vec<Box<dyn Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> + Sync + Send + 'static>>,
+    pub response: Vec<Box<dyn Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> + Sync + Send + 'static>>,
 }
 
 #[derive(Default)]

@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use crate::config::ServerConfig;
 use crate::exchange::Exchange;
 use crate::handler::Handler;
@@ -21,10 +22,12 @@ use std::future::Future;
 use std::io::Read;
 use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+use http_body_util::combinators::UnsyncBoxBody;
 use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
+use crate::attachment_key::AttachmentKey;
 use crate::service::ServiceExecutor;
 
 fn proxy_client(config: &ServerConfig) -> &'static ReverseProxy<HttpsConnector<HttpConnector>> {
@@ -79,10 +82,11 @@ impl ReverseProxyHandler {
     }
 }
 
-impl Handler for ReverseProxyHandler {
+impl Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> for ReverseProxyHandler
+{
     fn process<'i1, 'i2, 'o>(
         &'i1 self,
-        context: &'i2 mut Exchange,
+        context: &'i2 mut Exchange<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>>,
     ) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>>
     where
         'i1: 'o,
@@ -90,7 +94,9 @@ impl Handler for ReverseProxyHandler {
     {
         Box::pin(async move {
             if let Ok(req) = context.consume_request() {
-                let protocol: String = if context.server_config().tls_enabled {
+                let conf = context.attachment::<Arc<ServerConfig>>(AttachmentKey::APP_CONTEXT).unwrap();
+                let client_src = context.attachment::<SocketAddr>(AttachmentKey::CLIENT_SRC).unwrap();
+                let protocol: String = if conf.tls_enabled {
                     "http".to_string()
                 } else {
                     "https".to_string()
@@ -100,10 +106,11 @@ impl Handler for ReverseProxyHandler {
                     protocol,
                     self.destination_host(),
                     self.destination_port(),
-                    req.uri().path()
+                    //req.uri().path(),
+                    "temp"
                 );
-                let res = match proxy_client(context.server_config())
-                    .call(context.src().ip(), full_url.as_str(), req)
+                let res = match proxy_client(conf)
+                    .call(client_src.ip(), full_url.as_str(), req)
                     .await
                 {
                     Ok(res) => res,

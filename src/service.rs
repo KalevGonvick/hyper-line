@@ -8,8 +8,10 @@ use http_body_util::combinators::UnsyncBoxBody;
 use http_body_util::Empty;
 use hyper::body::{Bytes, Incoming};
 use hyper::{Request, Response, StatusCode};
+use http_body_util::BodyExt;
 use hyper::service::Service;
 use rustls::ServerConfig as TlsServerConfig;
+use crate::attachment_key::AttachmentKey;
 use crate::config::{HttpMethod, ServerConfig};
 use crate::exchange::Exchange;
 use crate::handler::Handler;
@@ -43,11 +45,19 @@ impl ExecutorService {
         }
     }
 
-    pub fn set_src(&mut self, src: SocketAddr) {
+    pub fn set_src(
+        &mut self,
+        src: SocketAddr
+    ) {
         self.src = Some(src);
     }
 
-    pub(self) async fn execute_handler_chain(&self, exchange: &mut Exchange, handlers: &Vec<Box<dyn Handler + Sync + Send + 'static>>) -> Result<(), ()> {
+    pub(self) async fn execute_handler_chain(
+        &self, exchange:
+        &mut Exchange<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>>,
+        handlers: &Vec<Box<dyn Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> + Sync + Send + 'static>>
+    ) -> Result<(), ()>
+    {
         for handler in handlers.iter() {
             match handler.process(exchange).await {
                 Ok(_) => {},
@@ -57,13 +67,19 @@ impl ExecutorService {
         Ok(())
     }
 
-    pub(self) fn create_error_response(status_code: StatusCode) -> Response<UnsyncBoxBody<Bytes, Infallible>> {
+    pub(self) fn create_error_response(
+        status_code: StatusCode
+    ) -> Response<UnsyncBoxBody<Bytes, Infallible>>
+    {
         let mut res = Response::new(UnsyncBoxBody::new(Empty::<Bytes>::new()));
         *res.status_mut() = status_code;
         res
     }
 
-    pub(crate) fn ssl_config(&self) -> &Option<TlsServerConfig> {
+    pub(crate) fn ssl_config(
+        &self
+    ) -> &Option<TlsServerConfig>
+    {
         &self.config.tls_server_config
     }
 }
@@ -84,7 +100,12 @@ impl Service<Request<Incoming>> for ExecutorService
                 Some(s) => s,
                 None => panic!("Invalid source IP!")
             };
-            let mut exchange = Exchange::new(src, exec_svc_context.config.clone());
+
+            let mut exchange = Exchange::new();
+
+            exchange.add_attachment::<SocketAddr>(AttachmentKey::CLIENT_SRC, Box::new(src));
+            exchange.add_attachment::<Arc<ServerConfig>>(AttachmentKey::APP_CONTEXT, Box::new(exec_svc_context.config.clone()));
+
             for path in &exec_svc_context.config.paths {
                 let req_method = &req.method().as_str();
                 let http_method = match HttpMethod::from_str(req_method) {
@@ -92,7 +113,14 @@ impl Service<Request<Incoming>> for ExecutorService
                     Err(_) => panic!("Could not convert method {}", &req.method().as_str())
                 };
                 if http_method == path.method && req.uri().path().starts_with(&path.path) {
-                    exchange.buffer_request(req).await.unwrap();
+                    //exchange.buffer_request(req).await.unwrap();
+                    let (parts, body) = req.into_parts();
+                    let body = match body.collect().await {
+                        Ok(x) => x,
+                        Err(_) => panic!("Failed to collect body"),
+                    }.boxed_unsync();
+                    let collected_req = Request::from_parts(parts, UnsyncBoxBody::new(body));
+                    exchange.save_request(collected_req);
 
                     /* execute request chain */
                     match exec_svc_context.execute_handler_chain(&mut exchange, &path.request).await {

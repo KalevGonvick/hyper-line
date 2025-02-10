@@ -13,12 +13,15 @@ pub struct ChainExecutionStartHandler;
 #[derive(Debug, Clone, Default)]
 pub struct ChainExecutionStopHandler;
 pub const TRACE_TIME: AttachmentKey = AttachmentKey(3);
-impl Handler for ChainExecutionStartHandler
+impl<I, O> Handler<I, O> for ChainExecutionStartHandler
+where
+    I: Default + Send + 'static,
+    O: Default + Send + 'static,
 {
 
     fn process<'i1, 'i2, 'o>(
         &'i1 self,
-        context: &'i2 mut Exchange
+        context: &'i2 mut Exchange<I, O>
     ) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>>
     where
         'i1: 'o,
@@ -33,12 +36,15 @@ impl Handler for ChainExecutionStartHandler
     }
 }
 
-impl Handler for ChainExecutionStopHandler
+impl<I, O> Handler<I, O> for ChainExecutionStopHandler
+where
+    I: Default + Send + 'static,
+    O: Default + Send + 'static,
 {
 
     fn process<'i1, 'i2, 'o>(
         &'i1 self,
-        context: &'i2 mut Exchange
+        context: &'i2 mut Exchange<I, O>
     ) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>>
     where
         'i1: 'o,

@@ -7,7 +7,8 @@ pub struct AttachmentKey(pub u32);
 impl AttachmentKey {
     /* common attachment keys */
     pub const APP_CONTEXT: AttachmentKey = AttachmentKey(1);
-    pub const CACHED_BODY: AttachmentKey = AttachmentKey(2);
+    pub const CLIENT_SRC: AttachmentKey = AttachmentKey(2);
+    pub const CACHED_BODY: AttachmentKey = AttachmentKey(3);
 }
 
 //impl<T> AttachmentKey2<T> {

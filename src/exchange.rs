@@ -12,30 +12,33 @@ use crate::status::Status;
 use http_body_util::BodyExt;
 use crate::config::ServerConfig;
 
-pub struct Exchange {
+pub struct Exchange<I, O>
+where
+    I: Default + Send + 'static,
+    O: Default + Send + 'static,
+{
     status: Status,
-    src: SocketAddr,
-    request: Request<UnsyncBoxBody<Bytes, Infallible>>,
-    response: Response<UnsyncBoxBody<Bytes, Infallible>>,
+    request: I,
+    response: O,
     request_listeners: Vec<Callback<Self>>,
     response_listeners: Vec<Callback<Self>>,
-    attachments: HashMap<(AttachmentKey, TypeId), Box<dyn Any + Send>>,
-    server_config: Arc<ServerConfig>
+    attachments: HashMap<(AttachmentKey, TypeId), Box<dyn Any + Send>>
 }
 
-impl Exchange {
+impl<I, O> Exchange<I, O>
+where
+    I: Default + Send + 'static,
+    O: Default + Send + 'static
+{
 
-    pub fn new(src: SocketAddr, server_config: Arc<ServerConfig>) -> Self {
-        log::debug!("Building new exchange for client: {}", src);
+    pub fn new() -> Self {
         Self {
             status: Status(200),
-            src,
-            request: Request::default(),
-            response: Response::default(),
+            request: I::default(),
+            response: O::default(),
             request_listeners: vec![],
             response_listeners: vec![],
-            attachments: HashMap::new(),
-            server_config
+            attachments: HashMap::new()
         }
     }
     pub fn add_attachment<K>(
@@ -143,23 +146,23 @@ impl Exchange {
         Ok(())
     }
 
-    pub async fn buffer_request(
-        &mut self,
-        request: Request<Incoming>
-    ) -> Result<(), ()>
-    {
-        let (parts, body) = request.into_parts();
-        let body = match body.collect().await {
-            Ok(x) => x,
-            Err(_) => return Err(()),
-        }.boxed_unsync();
-        let req = Request::from_parts(parts, UnsyncBoxBody::new(body));
-        Ok(self.request = req)
-    }
+//    pub async fn buffer_request(
+//        &mut self,
+//        request: Request<Incoming>
+//    ) -> Result<(), ()>
+//    {
+//        let (parts, body) = request.into_parts();
+//        let body = match body.collect().await {
+//            Ok(x) => x,
+//            Err(_) => return Err(()),
+//        }.boxed_unsync();
+//        let req = Request::from_parts(parts, UnsyncBoxBody::new(body));
+//        Ok(self.request = req)
+//    }
 
     pub fn save_request(
         &mut self,
-        request: Request<UnsyncBoxBody<Bytes, Infallible>>
+        request: I
     )
     {
         self.request = request;
@@ -167,33 +170,28 @@ impl Exchange {
 
     pub fn request(
         &self
-    ) -> Result<&Request<UnsyncBoxBody<Bytes, Infallible>>, ()>
+    ) -> Result<&I, ()>
     {
         if self.status.all_flags_clear(Status::REQUEST_CONSUMED) {
             return Ok(&self.request);
         }
 
         log::error!("A request has already been saved for this exchange.");
+
         Err(())
-    }
-
-    pub fn src(&self) -> &SocketAddr {
-        &self.src
-    }
-
-    pub fn server_config(&self) -> &ServerConfig {
-        &self.server_config
     }
 
     pub fn consume_request(
         &mut self
-    ) -> Result<Request<UnsyncBoxBody<Bytes, Infallible>>, ()>
+    ) -> Result<I, ()>
     {
         if self.status.all_flags_clear(Status::REQUEST_CONSUMED) {
             self.status |= Status::REQUEST_CONSUMED;
             match self.execute_request_listeners() {
                 Ok(_) => {
+
                     log::debug!("Successfully executed request listeners.");
+
                     let consumed = std::mem::take(&mut self.request);
                     return Ok(consumed);
                 }
@@ -206,7 +204,7 @@ impl Exchange {
 
     pub fn save_response(
         &mut self,
-        response: Response<UnsyncBoxBody<Bytes, Infallible>>
+        response: O
     )
     {
         self.response = response;
@@ -214,16 +212,20 @@ impl Exchange {
 
     pub fn consume_response(
         &mut self
-    ) -> Result<Response<UnsyncBoxBody<Bytes, Infallible>>, ()>
+    ) -> Result<O, ()>
     {
         if self.status.all_flags_clear(Status::RESPONSE_CONSUMED) {
             self.status |= Status::RESPONSE_CONSUMED;
             match self.execute_response_listeners() {
                 Ok(_) => {
+
                     log::debug!("Successfully executed response listeners.");
+
                     let response_code = self.status.0 & Status::RESPONSE_CODE_BITMASK;
-                    *self.response.status_mut() = hyper::StatusCode::from_u16(response_code as u16).unwrap();
+                    //*self.response.status_mut() = hyper::StatusCode::from_u16(response_code as u16).unwrap();
+
                     log::debug!("Response code: {}", response_code);
+
                     let consumed = std::mem::take(&mut self.response);
                     return Ok(consumed);
                 },

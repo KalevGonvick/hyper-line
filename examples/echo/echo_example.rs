@@ -1,5 +1,9 @@
+use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
+use http::Request;
+use http_body_util::combinators::UnsyncBoxBody;
+use hyper::body::Bytes;
 use hyper::Response;
 use log::info;
 use hyper_line::config::{HttpMethod, PathConfig};
@@ -10,10 +14,10 @@ use rustls::ServerConfig as TlsServerConfig;
 use hyper_line::cert_manager;
 
 struct ExampleEchoHandler;
-impl Handler for ExampleEchoHandler {
+impl Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> for ExampleEchoHandler {
     fn process<'i1, 'i2, 'o>(
         &'i1 self,
-        context: &'i2 mut hyper_line::exchange::Exchange
+        context: &'i2 mut hyper_line::exchange::Exchange<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>>
     ) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>>
     where
         'i1: 'o,

@@ -103,7 +103,6 @@ pub fn run_server(config: ServerConfig) -> Result<(), ()> {
             Err(_) => todo!()
         };
 
-
         /* handle https server connections */
         if config.tls_enabled {
             println!("Starting to serve on https://{}", addr);
