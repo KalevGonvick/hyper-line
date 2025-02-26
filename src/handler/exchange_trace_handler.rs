@@ -12,6 +12,8 @@ pub struct ChainExecutionStartHandler;
 
 #[derive(Debug, Clone, Default)]
 pub struct ChainExecutionStopHandler;
+
+
 pub const TRACE_TIME: AttachmentKey = AttachmentKey(3);
 impl<I, O> Handler<I, O> for ChainExecutionStartHandler
 where
@@ -52,7 +54,7 @@ where
         Self: 'o
     {
         Box::pin(async move {
-            context.add_response_listener(move |exchange| {
+            context.add_output_listener(move |exchange| {
                 let trace = match exchange.attachment::<SystemTime>(TRACE_TIME) {
                     None => return,
                     Some(trace) => trace.clone()

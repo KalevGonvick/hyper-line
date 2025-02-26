@@ -12,7 +12,12 @@ pub mod server;
 use std::convert::Infallible;
 use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::Bytes;
-pub type ChannelBody = UnsyncBoxBody<Bytes, Infallible>;
+use crate::handler::Handler;
+
+pub type HttpBody = UnsyncBoxBody<Bytes, Infallible>;
+pub type HttpRequest = http::Request<HttpBody>;
+pub type HttpResponse = http::Response<HttpBody>;
+pub type HttpHandler = Box<dyn Handler<HttpRequest, HttpResponse> + Sync + Send + 'static>;
 
 
 

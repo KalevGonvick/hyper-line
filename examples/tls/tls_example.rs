@@ -25,7 +25,7 @@ impl Handler for ExampleEchoHandler {
             let consumed = context.consume_request().unwrap();
             let (_, request) = consumed.into_parts();
             let echoed_response = Response::new(request);
-            context.save_response(echoed_response);
+            context.save_output(echoed_response);
             Ok(())
         })
     }

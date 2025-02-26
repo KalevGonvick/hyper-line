@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use crate::config::ServerConfig;
 use crate::exchange::Exchange;
 use crate::handler::Handler;
-use crate::ChannelBody;
+use crate::{HttpBody, HttpRequest, HttpResponse};
 use http_body_util::BodyExt;
 use http_body_util::Empty;
 use hyper::body::Bytes;
@@ -59,7 +59,7 @@ fn proxy_client(config: &ServerConfig) -> &'static ReverseProxy<HttpsConnector<H
             hyper_util::client::legacy::Builder::new(ServiceExecutor)
                 .pool_idle_timeout(Duration::from_secs(3))
                 .pool_timer(TokioTimer::new())
-                .build::<_, ChannelBody>(connector),
+                .build::<_, HttpBody>(connector),
         );
     })
 }
@@ -69,7 +69,7 @@ pub struct ReverseProxyHandler {
 }
 
 impl ReverseProxyHandler {
-    pub fn new(proxy_config: ProxyConfig) -> Self {
+    pub const fn new(proxy_config: ProxyConfig) -> Self {
         Self { proxy_config }
     }
 
@@ -82,11 +82,11 @@ impl ReverseProxyHandler {
     }
 }
 
-impl Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> for ReverseProxyHandler
+impl Handler<HttpRequest, HttpResponse> for ReverseProxyHandler
 {
     fn process<'i1, 'i2, 'o>(
         &'i1 self,
-        context: &'i2 mut Exchange<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>>,
+        context: &'i2 mut Exchange<HttpRequest, HttpResponse>,
     ) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>>
     where
         'i1: 'o,
@@ -116,7 +116,7 @@ impl Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<B
                     Ok(res) => res,
                     Err(e) => panic!("proxy failed with error: {:?}", e),
                 };
-                context.save_response(res);
+                context.save_output(res);
                 return Ok(());
             }
             Err(())
@@ -366,9 +366,9 @@ fn create_forward_uri<B>(forward_url: &str, req: &Request<B>) -> String {
 
 fn create_proxied_request(
     client_ip: IpAddr,
-    mut request: Request<ChannelBody>,
+    mut request: Request<HttpBody>,
     upgrade_type: Option<&String>,
-) -> Result<Request<ChannelBody>, ProxyError> {
+) -> Result<Request<HttpBody>, ProxyError> {
     debug!("Creating proxied request");
 
     let contains_te_trailers_value = request
@@ -448,9 +448,9 @@ fn get_upstream_addr(forward_uri: &str) -> Result<SocketAddr, ProxyError> {
 pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
     client_ip: IpAddr,
     forward_uri: &str,
-    request: Request<ChannelBody>,
-    client: &Client<T, ChannelBody>,
-) -> Result<Response<ChannelBody>, ProxyError> {
+    request: Request<HttpBody>,
+    client: &Client<T, HttpBody>,
+) -> Result<Response<HttpBody>, ProxyError> {
     debug!(
         "Received proxy call from {} to {}, client: {}",
         request.uri().to_string(),
@@ -529,11 +529,11 @@ pub async fn call<T: Connect + Clone + Send + Sync + 'static>(
 
 #[derive(Debug, Clone)]
 pub struct ReverseProxy<T: Connect + Clone + Send + Sync + 'static> {
-    client: Client<T, ChannelBody>,
+    client: Client<T, HttpBody>,
 }
 
 impl<T: Connect + Clone + Send + Sync + 'static> ReverseProxy<T> {
-    pub fn new(client: Client<T, ChannelBody>) -> Self {
+    pub fn new(client: Client<T, HttpBody>) -> Self {
         Self { client }
     }
 
@@ -541,8 +541,8 @@ impl<T: Connect + Clone + Send + Sync + 'static> ReverseProxy<T> {
         &self,
         client_ip: IpAddr,
         forward_uri: &str,
-        request: Request<ChannelBody>,
-    ) -> Result<Response<ChannelBody>, ProxyError> {
+        request: Request<HttpBody>,
+    ) -> Result<Response<HttpBody>, ProxyError> {
         call::<T>(client_ip, forward_uri, request, &self.client).await
     }
 }

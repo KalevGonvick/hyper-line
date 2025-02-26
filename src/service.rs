@@ -120,7 +120,7 @@ impl Service<Request<Incoming>> for ExecutorService
                         Err(_) => panic!("Failed to collect body"),
                     }.boxed_unsync();
                     let collected_req = Request::from_parts(parts, UnsyncBoxBody::new(body));
-                    exchange.save_request(collected_req);
+                    exchange.save_input(collected_req);
 
                     /* execute request chain */
                     match exec_svc_context.execute_handler_chain(&mut exchange, &path.request).await {
@@ -133,7 +133,7 @@ impl Service<Request<Incoming>> for ExecutorService
                         Ok(_) => log::trace!("Response handlers completed successfully."),
                         Err(_) => return Ok(Self::create_error_response(StatusCode::INTERNAL_SERVER_ERROR))
                     }
-                    return Ok(exchange.consume_response().unwrap())
+                    return Ok(exchange.consume_output().unwrap())
                 }
             }
             Ok(Self::create_error_response(StatusCode::NOT_FOUND))

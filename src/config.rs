@@ -1,12 +1,8 @@
-use std::convert::Infallible;
 use std::fmt::{Debug, Display};
 use std::str::FromStr;
-use http_body_util::combinators::UnsyncBoxBody;
-use hyper::body::Bytes;
-use hyper::{Request, Response};
 use serde::Deserialize;
 use rustls::{ClientConfig as TlsClientConfig, ServerConfig as TlsServerConfig};
-use crate::handler::Handler;
+use crate::HttpHandler;
 
 type ConfigError = Box<dyn std::error::Error>;
 
@@ -65,18 +61,18 @@ pub struct PathConfig
 {
     pub path: String,
     pub method: HttpMethod,
-    pub request: Vec<Box<dyn Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> + Sync + Send + 'static>>,
-    pub response: Vec<Box<dyn Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> + Sync + Send + 'static>>,
+    pub request: Vec<HttpHandler>,
+    pub response: Vec<HttpHandler>,
 }
 
 #[derive(Default)]
 pub struct ServerConfig {
-    pub(crate) worker_threads: usize,
-    pub(crate)worker_thread_name: String,
-    pub(crate) port: u16,
-    pub(crate) config_dir: String,
-    pub(crate) tls_enabled: bool,
-    pub(crate) tls_server_config: Option<TlsServerConfig>,
-    pub(crate) tls_client_config: Option<TlsClientConfig>,
-    pub(crate) paths: Vec<PathConfig>,
+    pub worker_threads: usize,
+    pub worker_thread_name: String,
+    pub port: u16,
+    pub config_dir: String,
+    pub tls_enabled: bool,
+    pub tls_server_config: Option<TlsServerConfig>,
+    pub tls_client_config: Option<TlsClientConfig>,
+    pub paths: Vec<PathConfig>,
 }

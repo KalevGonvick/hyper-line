@@ -18,10 +18,10 @@ where
     O: Default + Send + 'static,
 {
     status: Status,
-    request: I,
-    response: O,
-    request_listeners: Vec<Callback<Self>>,
-    response_listeners: Vec<Callback<Self>>,
+    input: I,
+    output: O,
+    input_listeners: Vec<Callback<Self>>,
+    output_listeners: Vec<Callback<Self>>,
     attachments: HashMap<(AttachmentKey, TypeId), Box<dyn Any + Send>>
 }
 
@@ -34,10 +34,10 @@ where
     pub fn new() -> Self {
         Self {
             status: Status(200),
-            request: I::default(),
-            response: O::default(),
-            request_listeners: vec![],
-            response_listeners: vec![],
+            input: I::default(),
+            output: O::default(),
+            input_listeners: vec![],
+            output_listeners: vec![],
             attachments: HashMap::new()
         }
     }
@@ -45,7 +45,9 @@ where
         &mut self,
         key: AttachmentKey,
         value: Box<dyn Any + Send>
-    ) where K: 'static + Send,
+    )
+    where
+        K: 'static + Send,
     {
         let type_id = TypeId::of::<K>();
         self.attachments.insert((key, type_id), value);
@@ -55,7 +57,8 @@ where
         &self,
         key: AttachmentKey
     ) -> Option<&K>
-    where K: 'static + Send,
+    where
+        K: 'static + Send,
     {
         let type_id = TypeId::of::<K>();
         if let Some(option_any) = self.attachments.get(&(key, type_id)) {
@@ -80,17 +83,7 @@ where
         }
     }
 
-    pub fn add_request_listener(
-        &mut self,
-        callback: impl Fn(Box<&Self>) + Send + 'static
-    ) where
-        Self: Send,
-        Self: Sized
-    {
-        self.request_listeners.push(Callback::new(callback))
-    }
-
-    pub fn add_response_listener(
+    pub fn add_input_listener(
         &mut self,
         callback: impl Fn(Box<&Self>) + Send + 'static
     )
@@ -98,29 +91,40 @@ where
         Self: Send,
         Self: Sized
     {
-        self.response_listeners.push(Callback::new(callback))
+        self.input_listeners.push(Callback::new(callback))
     }
 
-    fn execute_request_listeners(
+    pub fn add_output_listener(
+        &mut self,
+        callback: impl Fn(Box<&Self>) + Send + 'static
+    )
+    where
+        Self: Send,
+        Self: Sized
+    {
+        self.output_listeners.push(Callback::new(callback))
+    }
+
+    fn execute_input_listeners(
         &mut self
     ) -> Result<(), ()>
     {
         if self.status.all_flags_clear(Status::REQUEST_LISTENERS_COMPLETE) {
             self.status |= Status::REQUEST_LISTENERS_COMPLETE;
-            return self.execute_callbacks(&self.request_listeners);
+            return self.execute_callbacks(&self.input_listeners);
         }
 
         log::error!("Request listeners have already been executed.");
         Err(())
     }
 
-    fn execute_response_listeners(
+    fn execute_output_listeners(
         &mut self
     ) -> Result<(), ()>
     {
         if self.status.all_flags_clear(Status::RESPONSE_LISTENERS_COMPLETE) {
             self.status |= Status::RESPONSE_LISTENERS_COMPLETE;
-            return self.execute_callbacks(&self.response_listeners);
+            return self.execute_callbacks(&self.output_listeners);
         }
 
         log::error!("Response listeners have already been executed.");
@@ -146,34 +150,20 @@ where
         Ok(())
     }
 
-//    pub async fn buffer_request(
-//        &mut self,
-//        request: Request<Incoming>
-//    ) -> Result<(), ()>
-//    {
-//        let (parts, body) = request.into_parts();
-//        let body = match body.collect().await {
-//            Ok(x) => x,
-//            Err(_) => return Err(()),
-//        }.boxed_unsync();
-//        let req = Request::from_parts(parts, UnsyncBoxBody::new(body));
-//        Ok(self.request = req)
-//    }
-
-    pub fn save_request(
+    pub fn save_input(
         &mut self,
         request: I
     )
     {
-        self.request = request;
+        self.input = request;
     }
 
-    pub fn request(
+    pub fn input(
         &self
     ) -> Result<&I, ()>
     {
         if self.status.all_flags_clear(Status::REQUEST_CONSUMED) {
-            return Ok(&self.request);
+            return Ok(&self.input);
         }
 
         log::error!("A request has already been saved for this exchange.");
@@ -187,12 +177,12 @@ where
     {
         if self.status.all_flags_clear(Status::REQUEST_CONSUMED) {
             self.status |= Status::REQUEST_CONSUMED;
-            match self.execute_request_listeners() {
+            match self.execute_input_listeners() {
                 Ok(_) => {
 
                     log::debug!("Successfully executed request listeners.");
 
-                    let consumed = std::mem::take(&mut self.request);
+                    let consumed = std::mem::take(&mut self.input);
                     return Ok(consumed);
                 }
                 Err(_) => todo!()
@@ -202,21 +192,21 @@ where
         Err(())
     }
 
-    pub fn save_response(
+    pub fn save_output(
         &mut self,
         response: O
     )
     {
-        self.response = response;
+        self.output = response;
     }
 
-    pub fn consume_response(
+    pub fn consume_output(
         &mut self
     ) -> Result<O, ()>
     {
         if self.status.all_flags_clear(Status::RESPONSE_CONSUMED) {
             self.status |= Status::RESPONSE_CONSUMED;
-            match self.execute_response_listeners() {
+            match self.execute_output_listeners() {
                 Ok(_) => {
 
                     log::debug!("Successfully executed response listeners.");
@@ -226,7 +216,7 @@ where
 
                     log::debug!("Response code: {}", response_code);
 
-                    let consumed = std::mem::take(&mut self.response);
+                    let consumed = std::mem::take(&mut self.output);
                     return Ok(consumed);
                 },
                 Err(_) => todo!()

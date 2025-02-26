@@ -1,4 +1,4 @@
-pub(crate) struct Callback<T: Send + ?Sized> {
+pub struct Callback<T: Send + ?Sized> {
     callback: Box<dyn Fn(Box<&T>) + Send + 'static>
 }
 impl<T: Send + ?Sized> Callback<T> {
