@@ -1,5 +1,6 @@
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use hyper::Response;
 use log::info;
 use hyper_line::config::{HttpMethod, PathConfig};
@@ -7,13 +8,14 @@ use hyper_line::handler::Handler;
 use hyper_line::handler::reverse_proxy_handler::{ProxyConfig, ReverseProxyHandler};
 use hyper_line::server::ServerBuilder;
 use rustls::ServerConfig as TlsServerConfig;
-use hyper_line::cert_manager;
+use hyper_line::{cert_manager, HttpRequest, HttpResponse};
+use hyper_line::exchange::Exchange;
 
 struct ExampleEchoHandler;
-impl Handler for ExampleEchoHandler {
+impl Handler<HttpRequest, HttpResponse> for ExampleEchoHandler {
     fn process<'i1, 'i2, 'o>(
         &'i1 self,
-        context: &'i2 mut hyper_line::exchange::Exchange
+        context: &'i2 mut Exchange<HttpRequest, HttpResponse>
     ) -> Pin<Box<dyn Future<Output = Result<(), ()>> + Send + 'o>>
     where
         'i1: 'o,
@@ -51,7 +53,7 @@ fn main() {
         .add_path(PathConfig {
             path: "/test".to_string(),
             method: HttpMethod::Post,
-            request: vec![Box::new(ExampleEchoHandler{})],
+            request: vec![Arc::new(ExampleEchoHandler{})],
             response: vec![],
         });
 

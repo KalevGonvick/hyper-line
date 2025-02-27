@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use hyper_line::config::{HttpMethod, PathConfig};
 use hyper_line::handler::reverse_proxy_handler::{ProxyConfig, ReverseProxyHandler};
 use hyper_line::server::ServerBuilder;
@@ -12,7 +13,7 @@ fn main() {
         .add_path(PathConfig {
             path: "/test".to_string(),
             method: HttpMethod::Post,
-            request: vec![Box::new(ReverseProxyHandler::new(ProxyConfig {
+            request: vec![Arc::new(ReverseProxyHandler::new(ProxyConfig {
                 destination_port: 8081,
                 destination_host: "127.0.0.1".to_string(),
             }))],

@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::Arc;
 use http::Request;
 use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::Bytes;
@@ -46,7 +47,7 @@ fn main() {
         .add_path(PathConfig {
             path: "/test".to_string(),
             method: HttpMethod::Post,
-            request: vec![Box::new(ExampleEchoHandler{})],
+            request: vec![Arc::new(ExampleEchoHandler{})],
             response: vec![],
         });
 
