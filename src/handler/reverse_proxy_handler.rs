@@ -1,4 +1,3 @@
-use std::convert::Infallible;
 use crate::config::ServerConfig;
 use crate::exchange::Exchange;
 use crate::handler::Handler;
@@ -24,7 +23,6 @@ use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
-use http_body_util::combinators::UnsyncBoxBody;
 use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
 use crate::attachment_key::AttachmentKey;

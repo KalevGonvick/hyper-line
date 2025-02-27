@@ -161,31 +161,6 @@ pub fn run_server(config: ServerConfig) -> Result<(), ()> {
 
             }
         }
-        //            let server_certs = match load_certs("./server.pem") {
-        //                Ok(certs) => certs,
-        //                Err(_) => todo!()
-        //            };
-        //            let key = match load_private_key("./server.rsa") {
-        //                Ok(key) => key,
-        //                Err(_) => todo!()
-        //            };
-
-
-
-
-        //            let mut server_config = match TlsServerConfig::builder()
-        //                .with_no_client_auth()
-        //                .with_single_cert(server_certs, key)
-        //                .map_err(|_| todo!()) {
-        //                Ok(config) => config,
-        //                Err(_) => todo!()
-        //            };
-
-        //            server_config.alpn_protocols = vec![
-        //                b"h2".to_vec(),
-        //                b"http/1.1".to_vec()
-        //            ];
-
     })
 
 }

@@ -1,4 +1,4 @@
-use std::fmt::{Debug, Display};
+use std::fmt::Debug;
 use std::str::FromStr;
 use serde::Deserialize;
 use rustls::{ClientConfig as TlsClientConfig, ServerConfig as TlsServerConfig};

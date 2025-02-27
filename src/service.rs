@@ -15,6 +15,7 @@ use crate::attachment_key::AttachmentKey;
 use crate::config::{HttpMethod, ServerConfig};
 use crate::exchange::Exchange;
 use crate::handler::Handler;
+use crate::{HttpRequest, HttpResponse};
 
 #[derive(Clone)]
 pub struct ServiceExecutor;
@@ -54,8 +55,8 @@ impl ExecutorService {
 
     pub(self) async fn execute_handler_chain(
         &self, exchange:
-        &mut Exchange<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>>,
-        handlers: &Vec<Box<dyn Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> + Sync + Send + 'static>>
+        &mut Exchange<HttpRequest, HttpResponse>,
+        handlers: &Vec<Arc<dyn Handler<HttpRequest, HttpResponse> + Sync + Send + 'static>>
     ) -> Result<(), ()>
     {
         for handler in handlers.iter() {
@@ -69,7 +70,7 @@ impl ExecutorService {
 
     pub(self) fn create_error_response(
         status_code: StatusCode
-    ) -> Response<UnsyncBoxBody<Bytes, Infallible>>
+    ) -> HttpResponse
     {
         let mut res = Response::new(UnsyncBoxBody::new(Empty::<Bytes>::new()));
         *res.status_mut() = status_code;
@@ -86,7 +87,7 @@ impl ExecutorService {
 
 impl Service<Request<Incoming>> for ExecutorService
 {
-    type Response = Response<UnsyncBoxBody<Bytes, Infallible>>;
+    type Response = HttpResponse;
     type Error = Infallible;
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
