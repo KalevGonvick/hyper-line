@@ -1,5 +1,5 @@
-use crate::config::ServerConfig;
-use crate::exchange::Exchange;
+use crate::server::ServerConfig;
+use crate::exchange::{Exchange, AttachmentKey};
 use crate::handler::Handler;
 use crate::{HttpBody, HttpRequest, HttpResponse};
 use http_body_util::BodyExt;
@@ -25,7 +25,6 @@ use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::io::copy_bidirectional;
 use tokio::net::TcpStream;
-use crate::attachment_key::AttachmentKey;
 use crate::service::ServiceExecutor;
 
 fn proxy_client(config: &ServerConfig) -> &'static ReverseProxy<HttpsConnector<HttpConnector>> {
