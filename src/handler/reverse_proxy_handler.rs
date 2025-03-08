@@ -61,6 +61,7 @@ fn proxy_client(config: &ServerConfig) -> &'static ReverseProxy<HttpsConnector<H
     })
 }
 
+#[derive(Debug, Clone, Default)]
 pub struct ReverseProxyHandler {
     proxy_config: ProxyConfig,
 }
@@ -121,7 +122,7 @@ impl Handler<HttpRequest, HttpResponse> for ReverseProxyHandler
     }
 }
 
-#[derive(Deserialize)]
+#[derive(Default, Debug, Clone, Deserialize)]
 pub struct ProxyConfig {
     pub destination_host: String,
     pub destination_port: u16,

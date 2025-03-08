@@ -6,16 +6,18 @@ use http::Request;
 use http_body_util::combinators::UnsyncBoxBody;
 use hyper::body::Bytes;
 use hyper::Response;
-use log::info;
-use hyper_line::config::{HttpMethod, PathConfig};
-use hyper_line::handler::Handler;
+use log::{debug, info};
+use hyper_line::server::{HttpMethod, PathConfig};
+use hyper_line::handler::{Handler, HandlerId};
 use hyper_line::handler::reverse_proxy_handler::{ProxyConfig, ReverseProxyHandler};
 use hyper_line::server::ServerBuilder;
 use rustls::ServerConfig as TlsServerConfig;
 use hyper_line::cert_manager;
+use hyper_line::{HttpRequest, HttpResponse};
 
+#[derive(Default)]
 struct ExampleEchoHandler;
-impl Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>> for ExampleEchoHandler {
+impl Handler<HttpRequest, HttpResponse> for ExampleEchoHandler {
     fn process<'i1, 'i2, 'o>(
         &'i1 self,
         context: &'i2 mut hyper_line::exchange::Exchange<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<Bytes, Infallible>>>
@@ -34,10 +36,17 @@ impl Handler<Request<UnsyncBoxBody<Bytes, Infallible>>, Response<UnsyncBoxBody<B
             Ok(())
         })
     }
+
+    fn load_from_config(dir: &str) -> Arc<Self> {
+        debug!("Constructing ExampleEchoHandler");
+        Arc::new(Self::default())
+    }
 }
 
 fn main() {
     hyper_line::logger::setup_logger();
+
+    hyper_line::handler::register("EchoHandler", Arc::new(ExampleEchoHandler::load()));
 
     let mut builder = ServerBuilder::new();
     builder

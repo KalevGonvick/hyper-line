@@ -91,7 +91,8 @@ impl Service<Request<Incoming>> for ExecutorService
     type Future = Pin<Box<dyn Future<Output = Result<Self::Response, Self::Error>> + Send>>;
 
     fn call(
-        &self, req: Request<Incoming>
+        &self,
+        req: Request<Incoming>
     ) -> Self::Future
     {
         let exec_svc_context = self.clone();
