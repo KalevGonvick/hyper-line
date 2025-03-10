@@ -36,17 +36,12 @@ impl Handler<HttpRequest, HttpResponse> for ExampleEchoHandler {
             Ok(())
         })
     }
-
-    fn load_from_config(dir: &str) -> Arc<Self> {
-        debug!("Constructing ExampleEchoHandler");
-        Arc::new(Self::default())
-    }
 }
 
 fn main() {
     hyper_line::logger::setup_logger();
 
-    hyper_line::handler::register("EchoHandler", Arc::new(ExampleEchoHandler::load()));
+    hyper_line::handler::register("EchoHandler", Arc::new(ExampleEchoHandler::default()));
 
     let mut builder = ServerBuilder::new();
     builder

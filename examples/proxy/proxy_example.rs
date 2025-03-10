@@ -1,7 +1,6 @@
 use std::sync::Arc;
-use hyper_line::config::{HttpMethod, PathConfig};
 use hyper_line::handler::reverse_proxy_handler::{ProxyConfig, ReverseProxyHandler};
-use hyper_line::server::ServerBuilder;
+use hyper_line::server::{HttpMethod, PathConfig, ServerBuilder};
 
 fn main() {
     hyper_line::logger::setup_logger();
