@@ -12,6 +12,7 @@ where
     output: O,
     input_listeners: Vec<Callback<Self>>,
     output_listeners: Vec<Callback<Self>>,
+    custom_listeners: Vec<Callback<Self>>,
     attachments: HashMap<(AttachmentKey, TypeId), Box<dyn Any + Send>>
 }
 
@@ -28,6 +29,7 @@ where
             output: O::default(),
             input_listeners: vec![],
             output_listeners: vec![],
+            custom_listeners: vec![],
             attachments: HashMap::new()
         }
     }
@@ -73,13 +75,22 @@ where
         }
     }
 
+    pub fn add_custom_listener(
+        &mut self,
+        callback: impl Fn(Box<&Self>) + Send + 'static
+    )
+    where
+        Self: Send + Sized
+    {
+        self.custom_listeners.push(Callback::new(callback));
+    }
+
     pub fn add_input_listener(
         &mut self,
         callback: impl Fn(Box<&Self>) + Send + 'static
     )
     where
-        Self: Send,
-        Self: Sized
+        Self: Send + Sized
     {
         self.input_listeners.push(Callback::new(callback))
     }
@@ -89,18 +100,27 @@ where
         callback: impl Fn(Box<&Self>) + Send + 'static
     )
     where
-        Self: Send,
-        Self: Sized
+        Self: Send + Sized
     {
         self.output_listeners.push(Callback::new(callback))
+    }
+
+    fn execute_custom_listeners(&mut self) -> Result<(), ()> {
+        if self.status.all_flags_clear(Status::CUSTOM_LISTENERS_COMPLETE) {
+            self.status |= Status::CUSTOM_LISTENERS_COMPLETE;
+            return self.execute_callbacks(&self.custom_listeners);
+        }
+
+        log::error!("Custom listeners have already been executed.");
+        Err(())
     }
 
     fn execute_input_listeners(
         &mut self
     ) -> Result<(), ()>
     {
-        if self.status.all_flags_clear(Status::REQUEST_LISTENERS_COMPLETE) {
-            self.status |= Status::REQUEST_LISTENERS_COMPLETE;
+        if self.status.all_flags_clear(Status::INPUT_LISTENERS_COMPLETE) {
+            self.status |= Status::INPUT_LISTENERS_COMPLETE;
             return self.execute_callbacks(&self.input_listeners);
         }
 
@@ -112,8 +132,8 @@ where
         &mut self
     ) -> Result<(), ()>
     {
-        if self.status.all_flags_clear(Status::RESPONSE_LISTENERS_COMPLETE) {
-            self.status |= Status::RESPONSE_LISTENERS_COMPLETE;
+        if self.status.all_flags_clear(Status::OUTPUT_LISTENERS_COMPLETE) {
+            self.status |= Status::OUTPUT_LISTENERS_COMPLETE;
             return self.execute_callbacks(&self.output_listeners);
         }
 
@@ -152,7 +172,7 @@ where
         &self
     ) -> Result<&I, ()>
     {
-        if self.status.all_flags_clear(Status::REQUEST_CONSUMED) {
+        if self.status.all_flags_clear(Status::INPUT_CONSUMED) {
             return Ok(&self.input);
         }
 
@@ -165,8 +185,8 @@ where
         &mut self
     ) -> Result<I, ()>
     {
-        if self.status.all_flags_clear(Status::REQUEST_CONSUMED) {
-            self.status |= Status::REQUEST_CONSUMED;
+        if self.status.all_flags_clear(Status::INPUT_CONSUMED) {
+            self.status |= Status::INPUT_CONSUMED;
             match self.execute_input_listeners() {
                 Ok(_) => {
 
@@ -194,14 +214,14 @@ where
         &mut self
     ) -> Result<O, ()>
     {
-        if self.status.all_flags_clear(Status::RESPONSE_CONSUMED) {
-            self.status |= Status::RESPONSE_CONSUMED;
+        if self.status.all_flags_clear(Status::OUTPUT_CONSUMED) {
+            self.status |= Status::OUTPUT_CONSUMED;
             match self.execute_output_listeners() {
                 Ok(_) => {
 
                     log::debug!("Successfully executed response listeners.");
 
-                    let response_code = self.status.0 & Status::RESPONSE_CODE_BITMASK;
+                    let response_code = self.status.0 & Status::STATUS_CODE_BITMASK;
                     //*self.response.status_mut() = hyper::StatusCode::from_u16(response_code as u16).unwrap();
 
                     log::debug!("Response code: {}", response_code);
@@ -268,13 +288,14 @@ pub const fn i32_bit_mask(low: i32, high: i32) -> i32 {
 }
 
 impl Status {
-    pub const RESPONSE_CODE_BITMASK: i32 = i32_bit_mask(0, 9);
-    pub const REQUEST_CONSUMED: Self = Self(1 << 10);
-    pub const RESPONSE_CONSUMED: Self = Self(1 << 11);
-    pub const REQUEST_LISTENERS_COMPLETE: Self = Self(1 << 12);
-    pub const RESPONSE_LISTENERS_COMPLETE: Self = Self(1 << 13);
-    pub const REQUEST_BUFFERED: Self = Self(1 << 14);
-    pub const RESPONSE_BUFFERED: Self = Self(1 << 15);
+    pub const STATUS_CODE_BITMASK: i32 = i32_bit_mask(0, 9);
+    pub const INPUT_CONSUMED: Self = Self(1 << 10);
+    pub const OUTPUT_CONSUMED: Self = Self(1 << 11);
+    pub const INPUT_LISTENERS_COMPLETE: Self = Self(1 << 12);
+    pub const OUTPUT_LISTENERS_COMPLETE: Self = Self(1 << 13);
+    pub const CUSTOM_LISTENERS_COMPLETE: Self = Self(1 << 14);
+    pub const INPUT_BUFFERED: Self = Self(1 << 15);
+    pub const OUTPUT_BUFFERED: Self = Self(1 << 16);
 
     pub fn any_flags(&self, flags: Status) -> bool {
         self.0 & flags.0 != 0
@@ -336,5 +357,45 @@ impl BitOr for Status {
         rhs: Self
     ) -> Self::Output {
         Self(self.0 | rhs.0)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use log::info;
+    use super::*;
+
+    const TEST_ATTACHMENT: AttachmentKey = AttachmentKey(1);
+
+    #[test]
+    fn test_exchange_attachments() {
+        let mut ex: Exchange<usize, usize> = Exchange::new();
+        ex.add_attachment::<String>(TEST_ATTACHMENT, Box::new(String::from("This is a test value for the test attachment.")));
+        assert_eq!(ex.attachments.len(), 1);
+
+        match ex.attachment::<String>(TEST_ATTACHMENT) {
+            None => assert!(false),
+            Some(test_attachment) => {
+                assert_eq!(test_attachment, "This is a test value for the test attachment.");
+            }
+        }
+    }
+
+    #[test]
+    fn test_custom_listener() {
+        let mut ex: Exchange<usize, usize> = Exchange::new();
+        ex.add_custom_listener(|ex| {
+            info!("This is a custom listener executing...");
+        });
+
+        match ex.execute_custom_listeners() {
+            Ok(_) => assert!(true),
+            Err(_) => assert!(false, "Should execute custom listeners the first time.")
+        }
+
+        match ex.execute_custom_listeners() {
+            Ok(_) => assert!(false, "Should NOT execute custom listeners the second time."),
+            Err(_) => assert!(true),
+        }
     }
 }
